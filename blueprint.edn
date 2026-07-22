@@ -9,4 +9,43 @@
  :itonami.blueprint/required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :telemetry]
  :itonami.blueprint/optional-technologies []
  :itonami.blueprint/status :public-oss
- :itonami.blueprint/maturity :implemented}
+ :itonami.blueprint/maturity :implemented
+ :itonami.blueprint/implemented-slice
+ "TobaccoOpsAdvisor ⊣ Tobacco Operations Governor, langgraph-clj
+ StateGraph (langgraph.graph, tobaccoops.operation/build), append-only
+ audit ledger (tobaccoops.store/ledger + append-ledger!, MemStore and a
+ DatomicStore backed by langchain.db via langchain-store.core). Fixes a
+ prior gap: `deps.edn` declared `io.github.kotoba-lang/langgraph` only
+ under the never-invoked `:dev :override-deps` alias (override-deps
+ overrides an *existing* :deps entry -- with an empty :deps map it added
+ nothing to the real build/run path) and `tobaccoops.operation`'s own
+ docstring admitted it was 'a synchronous stub of this flow' that never
+ required `langgraph.graph` -- zero use of `state-graph`/`add-node`/
+ `compile-graph` anywhere in the file. Now: a genuinely compiled
+ StateGraph (`:intake -> :advise -> :govern -> :decide -+->
+ :commit / :request-approval -> :commit / :hold`) with
+ `interrupt-before #{:request-approval}` + in-memory checkpointer for
+ real human-in-the-loop resume. A back-office OPERATIONS COORDINATION
+ actor for tobacco-growing field management -- not direct
+ field-equipment operation authority and not curing-barn-temperature- or
+ pesticide-application-decision authority. Four ops
+ (`:log-cultivation-record` / `:schedule-field-operation` /
+ `:flag-crop-health-concern` / `:order-supplies`), all `:effect
+ :propose` only. Six HARD invariants (field-not-registered,
+ no-execution, equipment-or-curing-decision-blocked, op-not-allowed,
+ cultivation-record-invalid, leaf-grade-invalid) plus independent
+ cost/acreage/leaf-grade/confidence verification (`tobaccoops.registry`)
+ elaborate this blueprint's Governor. Crop-health-concern flagging
+ ALWAYS escalates to a human farmer/agronomist via the compiled graph's
+ `:request-approval` node (`interrupt-before`, checkpoint-based resume,
+ proven by `test/tobaccoops/operation_test.cljc` exercising commit /
+ hard-hold (unregistered field) / escalate-approve / escalate-reject /
+ phase-0-forces-escalation through the REAL compiled graph end to end,
+ plus a `clojure -M:dev:run` demo runner producing real ledger entries
+ for every scenario). MemStore and DatomicStore pass the same
+ store-contract test (`test/tobaccoops/store_contract_test.cljc`). 43
+ tests / 162 assertions green (`clojure -M:dev:test`), clj-kondo 0
+ errors, demo runnable end-to-end against both Store backends
+ (`clojure -M:dev:run`). Governance-doc set and `docs/` were already
+ present; CI (`.github/workflows/ci.yml`, sibling-checkout pattern for
+ :local/root deps) was missing and is added in this fix."}

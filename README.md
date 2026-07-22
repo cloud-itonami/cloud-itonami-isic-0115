@@ -14,14 +14,30 @@ decisions.
 `TobaccoOpsAdvisor` (`tobaccoops.advisor`) and the independent
 `TobaccoOperationsGovernor` (`tobaccoops.governor`), composed by
 `tobaccoops.operation` following the itonami actor pattern
-(ADR-2607011000): `advise -> govern -> phase-gate -> commit | escalate |
-hold`. See `clojure -M:test` output below for the current green count.
+(ADR-2607011000): `intake -> advise -> govern -> decide -> commit |
+request-approval -> commit | hold`, compiled to a real `langgraph-clj`
+`StateGraph` (`langgraph.graph/state-graph` + `compile-graph`, mirroring
+`cerealops.operation`, cloud-itonami-isic-0111) with
+`interrupt-before #{:request-approval}` and checkpoint-based
+human-in-the-loop resume for escalated operations. Every commit/hold/
+approval-rejected decision fact is appended to `tobaccoops.store`'s
+append-only audit ledger (`ledger`/`append-ledger!`), implemented on
+both `MemStore` and a `DatomicStore` (backed by `langchain.db` via
+`kotoba-lang/langchain-store`) that pass the same store-contract test
+(`test/tobaccoops/store_contract_test.cljc`). 43 tests / 162 assertions
+green (`clojure -M:dev:test`); the demo runner (`clojure -M:dev:run`)
+drives the compiled graph end-to-end through a commit path, an
+escalate→approve→commit path, an escalate→reject→hold path, and a
+hard-hold path, printing the resulting audit ledger.
 
-`tobaccoops.operation` is a synchronous stub of this flow (see its
-docstring) — production wiring into a `langgraph-clj` StateGraph with
-`interrupt-before`/checkpoint-based human-in-the-loop resume for escalated
-operations is deferred, mirroring `cloud-itonami-isic-0116`'s own
-`fibreops.operation`.
+Previously `tobaccoops.operation` was a synchronous stub of this flow
+(`build` returned a plain `fn` that never required `langgraph.graph`,
+despite `deps.edn` claiming a real `io.github.kotoba-lang/langgraph`
+dependency reachable only from the never-invoked `:dev :override-deps`
+alias) — the deferred-stub gap is now fixed; `langgraph` and
+`langchain-store` live in the real `:deps` map, and `build` returns a
+genuinely compiled StateGraph, proven end-to-end by
+`test/tobaccoops/operation_test.cljc`.
 
 ## What this does NOT do
 
@@ -127,12 +143,18 @@ Mirrors `cloud-itonami-isic-0116` (`fibreops.*`) module-for-module:
   vocabulary
 - `tobaccoops.registry` — pure independent verification functions
   (cost/acreage/leaf-grade/confidence)
-- `tobaccoops.store` — `Store` protocol + in-memory `MemStore` (field registration lookup)
-- `tobaccoops.advisor` — `Advisor` protocol + `MockAdvisor` (the sealed LLM/decision node)
+- `tobaccoops.store` — `Store` protocol: field registration lookup + append-only audit
+  ledger, implemented by `MemStore` (in-memory, default) and `DatomicStore`
+  (`langchain.db`-backed, via `kotoba-lang/langchain-store`)
+- `tobaccoops.advisor` — `Advisor` protocol + `MockAdvisor` (the sealed LLM/decision
+  node; a real-LLM `Advisor` implementation is the documented next seam, same as
+  every sibling cloud-itonami actor's advisor)
 - `tobaccoops.governor` — `TobaccoOperationsGovernor`: hard invariants + escalation gates
 - `tobaccoops.phase` — 0→3 rollout phase gate
-- `tobaccoops.operation` — composes advisor → governor → phase into one operation run
-- `tobaccoops.sim` — demo runner (`clojure -M:run`)
+- `tobaccoops.operation` — compiles the `langgraph-clj` `StateGraph`: advise → govern →
+  decide → commit | request-approval → commit | hold, with `interrupt-before` +
+  checkpoint-based resume for escalated operations
+- `tobaccoops.sim` — demo runner (`clojure -M:dev:run`)
 
 ## Capability layer
 
@@ -153,10 +175,15 @@ See [`docs/business-model.md`](docs/business-model.md) and
 ## Testing
 
 ```bash
-clojure -M:test   # run the test suite
-clojure -M:lint   # clj-kondo, 0 errors / 0 warnings
-clojure -M:run    # demo runner
+clojure -M:dev:test   # run the test suite (langgraph/langchain-store resolved via local sibling checkouts)
+clojure -M:lint       # clj-kondo, 0 errors / 0 warnings
+clojure -M:dev:run    # demo runner -- drives the compiled StateGraph end-to-end
 ```
+
+`:dev` pins the transitive `langchain` dependency to the in-monorepo local
+checkout (`../../kotoba-lang/langchain`) for offline workspace development;
+a standalone fork should override `deps.edn`'s `:local/root` coordinates
+with git coordinates (see `deps.edn`'s own comment).
 
 ## License
 
