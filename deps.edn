@@ -11,17 +11,27 @@
  ;; an external lib. This repo is standalone (forkable outside the
  ;; workspace); the :local/root paths only resolve inside the monorepo
  ;; checkout -- a standalone fork should override them with git
- ;; coordinates. For testing/CI without langgraph, use the core logic in
- ;; run-operation; production deployment requires the langgraph StateGraph
- ;; integration.
- :deps {}
+ ;; coordinates.
+ ;;
+ ;; FIX (deferred-stub bug): `langgraph` used to be declared ONLY under the
+ ;; :dev :override-deps alias. :override-deps only *overrides an existing
+ ;; :deps entry* -- with an empty :deps map it never added langgraph to the
+ ;; real build/run path. `tobaccoops.operation` therefore never actually
+ ;; required `langgraph.graph` and the "actor" was a synchronous stub
+ ;; pretending to run a StateGraph (see its old docstring, now removed).
+ ;; `langgraph` and `langchain-store` (the shared store seam -- EDN-blob
+ ;; codec + identity schema + event-log helpers, ADR-2607141600) now live
+ ;; in the real :deps map, same shape as cloud-itonami-isic-0111
+ ;; (cerealops) / cloud-itonami-isic-869 (transportops).
+ :deps {io.github.kotoba-lang/langgraph
+        {:local/root "../../kotoba-lang/langgraph"}
+        io.github.kotoba-lang/langchain-store
+        {:local/root "../../kotoba-lang/langchain-store"}}
  :aliases
  {;; offline workspace dev -- pin transitive langchain to local checkout
   :dev {:override-deps
         {io.github.kotoba-lang/langchain
-         {:local/root "../../kotoba-lang/langchain"}
-        io.github.kotoba-lang/langgraph
-        {:local/root "../../kotoba-lang/langgraph"}}}
+         {:local/root "../../kotoba-lang/langchain"}}}
   ;; clojure -M:dev:run  -> drive the demo through one OperationActor
   :run {:main-opts ["-m" "tobaccoops.sim"]}
   :test {:extra-paths ["test"]

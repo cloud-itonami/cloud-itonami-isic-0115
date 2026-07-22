@@ -1,48 +1,76 @@
 (ns tobaccoops.sim
-  "Simple simulation/demo runner for the Tobacco-Growing Operations
-  Coordinator actor. Used to validate that the actor flow compiles and
-  basic proposal flow works. Mirrors `fibreops.sim`
-  (cloud-itonami-isic-0116)."
-  (:require [tobaccoops.operation :as operation]
+  "Demo driver -- `clojure -M:dev:run`. Walks a registered field through a
+  clean phase-3 auto-commit, an always-escalate crop-health concern
+  (human approves), a high-cost supply order (human rejects), and a hard
+  hold (unregistered field), then prints the resulting audit ledger.
+  Mirrors `cerealops.sim` (cloud-itonami-isic-0111)."
+  (:require [langgraph.graph :as g]
+            [tobaccoops.operation :as operation]
             [tobaccoops.store :as store]))
 
+(def farmer {:actor-id "tobacco-ops-01" :role :farm-operator :phase :phase-3})
+
+(defn- exec-op [actor tid request context]
+  (g/run* actor {:request request :context context} {:thread-id tid}))
+
+(defn- approve! [actor tid]
+  (g/run* actor {:approval {:status :approved :by "tobacco-ops-01"}}
+          {:thread-id tid :resume? true}))
+
+(defn- reject! [actor tid]
+  (g/run* actor {:approval {:status :rejected :by "tobacco-ops-01"}}
+          {:thread-id tid :resume? true}))
+
 (defn demo
-  "Run a simple demo scenario: register a field, propose a cultivation
-  record log, and check the disposition flow."
+  "Run the compiled StateGraph through a commit path, an
+  escalate->approve->commit path, an escalate->reject->hold path, and a
+  hard-hold path; print each result and the final audit ledger."
   []
-  (let [;; Create store with a registered field
-        st (store/mem-store
+  (let [st (store/mem-store
             {:initial-fields
              {"field-001"
               {:id "field-001"
                :name "Test Farm North Field"
                :tobacco-type "burley"}}})
-
-        ;; Build actor
-        actor (operation/build st)
-
-        ;; Create a request to log a cultivation record
-        request {:op :log-cultivation-record
-                 :field-id "field-001"
-                 :acreage 40
-                 :tobacco-type "burley"
-                 :leaf-grade "grade-a"
-                 :record-type "curing"}
-
-        ;; Context with phase 0 (simulation)
-        context {:actor-id "tobacco-ops-01"
-                 :role :farm-operator
-                 :phase :phase-0}]
+        actor (operation/build st)]
 
     (println "=== Tobacco-Growing Operations Coordinator Demo ===")
-    (println "Demo field: field-001")
-    (println "Request: log-cultivation-record")
-    (println "Phase: phase-0 (simulation)")
-    (println "Expected: escalate (phase-0 forces human review of all commits)")
-    (println)
-    (let [result (actor request context)]
-      (println "Result disposition:" (:disposition result))
-      result)))
+
+    (println "\n== log-cultivation-record field-001 (phase-3, governor-clean -> commit) ==")
+    (println (exec-op actor "t1"
+                      {:op :log-cultivation-record :field-id "field-001"
+                       :acreage 40 :tobacco-type "burley" :leaf-grade "grade-a"
+                       :record-type "curing"}
+                      farmer))
+
+    (println "\n== flag-crop-health-concern field-001 (ALWAYS escalates -- farmer/agronomist approves) ==")
+    (let [r (exec-op actor "t2"
+                     {:op :flag-crop-health-concern :field-id "field-001"
+                      :concern "タバコスズメガ（tobacco hornworm）の可能性"}
+                     farmer)]
+      (println r)
+      (println "-- farmer/agronomist approves --")
+      (println (approve! actor "t2")))
+
+    (println "\n== order-supplies field-001 over cost threshold (escalates -- farmer rejects) ==")
+    (let [r (exec-op actor "t3"
+                     {:op :order-supplies :field-id "field-001"
+                      :category "curing-fuel" :cost 1200}
+                     farmer)]
+      (println r)
+      (println "-- farmer rejects --")
+      (println (reject! actor "t3")))
+
+    (println "\n== log-cultivation-record field-999 (unregistered -> HARD hold, no interrupt) ==")
+    (println (exec-op actor "t4"
+                      {:op :log-cultivation-record :field-id "field-999"
+                       :acreage 50 :tobacco-type "flue-cured"}
+                      farmer))
+
+    (println "\n== audit ledger ==")
+    (doseq [f (store/ledger st)] (println f))
+
+    {:ledger (store/ledger st)}))
 
 (defn -main
   "clojure -M:run entrypoint."
@@ -52,4 +80,4 @@
 (comment
   ;; In a real REPL:
   (demo)
-)
+  )
