@@ -1,4 +1,4 @@
-{:itonami.blueprint/id "cloud-itonami-0115"
+{:itonami.blueprint/id "cloud-itonami-isic-0115"
  :itonami.blueprint/name "Tobacco-Growing Operations Coordination"
  :itonami.blueprint/isic-rev5 "0115"
  :itonami.blueprint/domain :agriculture/tobacco-growing
