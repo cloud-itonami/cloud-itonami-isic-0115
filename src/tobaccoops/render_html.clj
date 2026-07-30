@@ -1,0 +1,156 @@
+(ns tobaccoops.render-html
+  "Build-time HTML renderer for `docs/samples/operator-console.html`.
+
+  Closes flagship checklist item 2 (com-junkawasaki/root ADR-2607189300,
+  Wave5). Drives the REAL actor stack (`tobaccoops.operation` ->
+  `tobaccoops.governor` -> `tobaccoops.store`) through a scenario adapted
+  from this repo's own `tobaccoops.sim` demo driver, rendered
+  deterministically -- no invented numbers/ids/ops (the template's #1
+  discipline).
+
+  Usage: `clojure -M:dev:render-html [out-file]`
+  (default `docs/samples/operator-console.html`)."
+  (:require [clojure.string :as str]
+            [tobaccoops.store :as store]
+            [tobaccoops.operation :as op]
+            [langgraph.graph :as g]))
+
+(def ^:private operator
+  {:actor-id "tobacco-ops-01" :role :farm-operator :phase :phase-3})
+
+(defn- exec! [actor tid request]
+  (g/run* actor {:request request :context operator} {:thread-id tid}))
+
+(defn- approve! [actor tid]
+  (g/run* actor {:approval {:status :approved :by "tobacco-ops-01"}}
+          {:thread-id tid :resume? true}))
+
+(defn- reject! [actor tid]
+  (g/run* actor {:approval {:status :rejected :by "tobacco-ops-01"}}
+          {:thread-id tid :resume? true}))
+
+(defn run-demo!
+  "Runs a freshly seeded store through a scenario mixing every disposition
+  this actor can reach: field-001 logs a clean curing cultivation record
+  (phase-3 auto-commit), a crop-health concern (ALWAYS escalates -- farmer
+  approves), an over-cost-threshold curing-fuel supply order (escalates --
+  farmer REJECTS -> hold), and a log-cultivation-record against an
+  UNREGISTERED field (field-999) which HARD-holds before any human. Every
+  id/op/value is from tobaccoops.sim / tobaccoops.governor /
+  tobaccoops.store -- no invented values."
+  []
+  (let [db (store/mem-store
+            {:initial-fields
+             {"field-001" {:id "field-001" :name "Test Farm North Field" :tobacco-type "burley"}}})
+        actor (op/build db)]
+    (exec! actor "t1" {:op :log-cultivation-record :field-id "field-001"
+                       :acreage 40 :tobacco-type "burley" :leaf-grade "grade-a" :record-type "curing"})
+    (exec! actor "t2" {:op :flag-crop-health-concern :field-id "field-001"
+                       :concern "tobacco-hornworm-suspected"})
+    (approve! actor "t2")
+    (exec! actor "t3" {:op :order-supplies :field-id "field-001"
+                       :category "curing-fuel" :cost 1200})
+    (reject! actor "t3")
+    (exec! actor "t4" {:op :log-cultivation-record :field-id "field-999"
+                       :acreage 50 :tobacco-type "flue-cured" :record-type "curing"})
+    db))
+
+;; ----------------------------- rendering -----------------------------
+
+(defn- esc [v]
+  (-> (str v)
+      (str/replace "&" "&amp;")
+      (str/replace "<" "&lt;")
+      (str/replace ">" "&gt;")))
+
+(defn- last-fact-for [ledger field-id]
+  (last (filter #(= (:subject %) field-id) ledger)))
+
+(defn- status-cell [ledger field-id]
+  (let [f (last-fact-for ledger field-id)]
+    (cond
+      (nil? f) "<span class=\"muted\">no activity</span>"
+      (= :committed (:t f)) "<span class=\"ok\">committed</span>"
+      (= :approval-granted (:t f)) "<span class=\"ok\">approved &amp; committed</span>"
+      (= :governor-hold (:t f))
+      (let [rule (-> f :basis first)]
+        (str "<span class=\"critical\">HARD hold &middot; " (esc (name (or rule :unknown))) "</span>"))
+      (= :approval-requested (:t f)) "<span class=\"warn\">awaiting approval</span>"
+      :else "<span class=\"muted\">in progress</span>")))
+
+(defn- ledger-row [{:keys [t op subject disposition basis]}]
+  (format "        <tr><td>%s</td><td><code>%s</code></td><td>%s</td><td>%s</td></tr>"
+          (esc (name t)) (esc (name (or op :n-a))) (esc subject)
+          (esc (or (some->> basis (map name) (str/join ", "))
+                   (some-> disposition name) ""))))
+
+(def ^:private action-gate-rows
+  ["        <tr><td><code>:log-cultivation-record</code></td><td><span class=\"ok\">auto-commit when clean + registered field</span></td></tr>"
+   "        <tr><td><code>:flag-crop-health-concern</code></td><td><span class=\"warn\">ALWAYS human approval (crop safety)</span></td></tr>"
+   "        <tr><td><code>:order-supplies</code></td><td><span class=\"warn\">human approval over cost threshold; recompute + reject path</span></td></tr>"])
+
+(defn render
+  "Renders the operator-console.html from a store `db` that has run `run-demo!`."
+  [db]
+  (let [ledger (vec (store/ledger db))
+        field-001 (store/registered-field db "field-001")
+        ledger-rows (str/join "\n" (map ledger-row ledger))]
+    (str
+     "<html><head><meta charset=\"utf-8\"><title>cloud-itonami-isic-0115 &middot; tobacco-growing ops</title><style>"
+     "body{font:14px/1.5 -apple-system,system-ui,sans-serif;margin:0;color:#1a1a1a;background:#f5f5f5}"
+     ".bar{background:#3a2a1a;color:#fff;padding:1.2rem 2rem}.bar h1{margin:0;font-size:1.15rem;font-weight:600}"
+     ".badge{display:inline-block;margin-top:.4rem;font-size:.75rem;opacity:.8}"
+     "main{max-width:980px;margin:1.5rem auto;padding:0 1rem}"
+     ".card{background:#fff;border-radius:8px;padding:1.2rem 1.4rem;margin-bottom:1.2rem;box-shadow:0 1px 3px rgba(0,0,0,.08)}"
+     ".card h2{margin-top:0;font-size:1rem}.muted{color:#777;font-size:.82rem}"
+     "table{border-collapse:collapse;width:100%;font-size:.85rem}th,td{text-align:left;padding:.42rem .5rem;border-bottom:1px solid #eee}th{font-weight:600;color:#555}"
+     ".ok{color:#0a7d33}.warn{color:#9a6700}.critical{color:#b41010;font-weight:600}code{background:#f0f0f0;padding:.1rem .3rem;border-radius:3px;font-size:.8rem}"
+     "</style></head><body>\n"
+     "<header class=\"bar\">\n"
+     "  <h1>Tobacco-growing ops (ISIC 0115) — Operator Console</h1>\n"
+     "  <span class=\"badge\">read-only sample · governor-gated · crop-health / supply orders always human-approved</span>\n"
+     "</header>\n"
+     "<main>\n"
+     "  <section class=\"card\">\n"
+     "    <h2>Scenario field</h2>\n"
+     "    <p class=\"muted\">Demo snapshot — build-time-generated from <code>tobaccoops.store</code> via <code>tobaccoops.render-html</code> (<code>clojure -M:dev:render-html</code>), regenerated nightly. No invented data.</p>\n"
+     "    <table>\n"
+     "      <thead><tr><th>Field</th><th>Name</th><th>Tobacco type</th><th>Last op status</th></tr></thead>\n"
+     "      <tbody>\n"
+     "        <tr><td>" (esc (:id field-001)) "</td><td>" (esc (:name field-001)) "</td><td>" (esc (:tobacco-type field-001))
+     "</td><td>" (status-cell ledger "field-001") "</td></tr>\n"
+     "        <tr><td>field-999</td><td class=\"muted\">(unregistered)</td><td class=\"muted\">—</td><td>" (status-cell ledger "field-999") "</td></tr>\n"
+     "      </tbody>\n"
+     "    </table>\n"
+     "  </section>\n"
+     "  <section class=\"card\">\n"
+     "    <h2>Action gate (TobaccoOps Governor)</h2>\n"
+     "    <p class=\"muted\">HARD holds cannot be overridden. Unregistered fields are rejected before any human; supply-order cost thresholds enforce human review.</p>\n"
+     "    <table>\n"
+     "      <thead><tr><th>Op</th><th>Gate</th></tr></thead>\n"
+     "      <tbody>\n"
+     (str/join "\n" action-gate-rows) "\n"
+     "      </tbody>\n"
+     "    </table>\n"
+     "  </section>\n"
+     "  <section class=\"card\">\n"
+     "    <h2>Audit ledger (this run)</h2>\n"
+     "    <p class=\"muted\">Append-only decision-fact log — every proposal, hold and commit this scenario produced.</p>\n"
+     "    <table>\n"
+     "      <thead><tr><th>Fact</th><th>Op</th><th>Subject</th><th>Basis</th></tr></thead>\n"
+     "      <tbody>\n"
+     ledger-rows "\n"
+     "      </tbody>\n"
+     "    </table>\n"
+     "  </section>\n"
+     "</main>\n"
+     "</body></html>\n")))
+
+(defn -main [& args]
+  (let [out (or (first args) "docs/samples/operator-console.html")
+        db (run-demo!)
+        html (render db)
+        out-file (java.io.File. out)]
+    (.. out-file getParentFile mkdirs)
+    (spit out-file html)
+    (println "wrote" out "(" (count (store/ledger db)) "ledger facts )")))
