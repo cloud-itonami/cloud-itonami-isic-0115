@@ -24,7 +24,7 @@ approval-rejected decision fact is appended to `tobaccoops.store`'s
 append-only audit ledger (`ledger`/`append-ledger!`), implemented on
 both `MemStore` and a `DatomicStore` (backed by `langchain.db` via
 `kotoba-lang/langchain-store`) that pass the same store-contract test
-(`test/tobaccoops/store_contract_test.cljc`). 43 tests / 162 assertions
+(`test/tobaccoops/store_contract_test.cljk`). 43 tests / 162 assertions
 green (`clojure -M:dev:test`); the demo runner (`clojure -M:dev:run`)
 drives the compiled graph end-to-end through a commit path, an
 escalate→approve→commit path, an escalate→reject→hold path, and a
@@ -37,7 +37,7 @@ dependency reachable only from the never-invoked `:dev :override-deps`
 alias) — the deferred-stub gap is now fixed; `langgraph` and
 `langchain-store` live in the real `:deps` map, and `build` returns a
 genuinely compiled StateGraph, proven end-to-end by
-`test/tobaccoops/operation_test.cljc`.
+`test/tobaccoops/operation_test.cljk`.
 
 ## What this does NOT do
 
