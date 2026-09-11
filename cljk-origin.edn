@@ -1,0 +1,21 @@
+{:format :kotoba.cljk-origin/v1
+ :renamed-on "2026-09-11"
+ :decision "adr-2609111500-cljk-rename-all-clojure-source (com-junkawasaki/root 90-docs/adr; owner instruction 2026-09-11)"
+ :rule "value = the extension the file had before the rename. A path ending in .clj.cljk or .cljs.cljk kept it in the name because both platform files existed (or the plain target was taken)."
+ :origins
+ {"src/tobaccoops/advisor.cljk" ".cljc"
+  "src/tobaccoops/facts.cljk" ".cljc"
+  "src/tobaccoops/governor.cljk" ".cljc"
+  "src/tobaccoops/operation.cljk" ".cljc"
+  "src/tobaccoops/phase.cljk" ".cljc"
+  "src/tobaccoops/registry.cljk" ".cljc"
+  "src/tobaccoops/render_html.cljk" ".clj"
+  "src/tobaccoops/sim.cljk" ".cljc"
+  "src/tobaccoops/store.cljk" ".cljc"
+  "test/tobaccoops/facts_test.cljk" ".cljc"
+  "test/tobaccoops/governor_test.cljk" ".cljc"
+  "test/tobaccoops/operation_test.cljk" ".cljc"
+  "test/tobaccoops/phase_test.cljk" ".cljc"
+  "test/tobaccoops/registry_test.cljk" ".cljc"
+  "test/tobaccoops/store_contract_test.cljk" ".cljc"
+  "test/tobaccoops/store_test.cljk" ".cljc"}}

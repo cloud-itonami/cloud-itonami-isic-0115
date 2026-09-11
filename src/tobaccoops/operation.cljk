@@ -44,7 +44,7 @@
   *existing* :deps entry, it does not add a new one to an empty :deps
   map). `build` now returns a genuinely compiled
   `langgraph.graph/state-graph`, proven end-to-end by
-  `test/tobaccoops/operation_test.cljc`."
+  `test/tobaccoops/operation_test.cljk`."
   (:require [langgraph.graph :as g]
             [langgraph.checkpoint :as cp]
             [tobaccoops.advisor :as advisor]
