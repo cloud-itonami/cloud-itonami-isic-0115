@@ -1,5 +1,5 @@
 (ns tobaccoops.sim
-  "Demo driver -- `clojure -M:dev:run`. Walks a registered field through a
+  "Demo driver -- `kbb -M:dev:run`. Walks a registered field through a
   clean phase-3 auto-commit, an always-escalate crop-health concern
   (human approves), a high-cost supply order (human rejects), and a hard
   hold (unregistered field), then prints the resulting audit ledger.
@@ -73,7 +73,7 @@
     {:ledger (store/ledger st)}))
 
 (defn -main
-  "clojure -M:run entrypoint."
+  "kbb -M:run entrypoint."
   [& _args]
   (demo))
 
