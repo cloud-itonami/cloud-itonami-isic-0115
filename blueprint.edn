@@ -41,11 +41,11 @@
  proven by `test/tobaccoops/operation_test.cljk` exercising commit /
  hard-hold (unregistered field) / escalate-approve / escalate-reject /
  phase-0-forces-escalation through the REAL compiled graph end to end,
- plus a `clojure -M:dev:run` demo runner producing real ledger entries
+ plus a `kbb -M:dev:run` demo runner producing real ledger entries
  for every scenario). MemStore and DatomicStore pass the same
  store-contract test (`test/tobaccoops/store_contract_test.cljk`). 43
- tests / 162 assertions green (`clojure -M:dev:test`), clj-kondo 0
+ tests / 162 assertions green (`kbb -M:dev:test`), clj-kondo 0
  errors, demo runnable end-to-end against both Store backends
- (`clojure -M:dev:run`). Governance-doc set and `docs/` were already
+ (`kbb -M:dev:run`). Governance-doc set and `docs/` were already
  present; CI (`.github/workflows/ci.yml`, sibling-checkout pattern for
  :local/root deps) was missing and is added in this fix."}
