@@ -1,0 +1,34 @@
+;; What this vertical's robot physically does, declared for
+;; kotoba.robotics.process (kotoba-lang/robotics). `kbb -M:dev:physics` runs it.
+;;
+;; README "Robotics premise": a field-management robot keeps cultivation
+;; records and schedules field and curing operations for a tobacco farm (ISIC
+;; 0115). Its physical work: pushing racks of green leaf into the curing barn
+;; and running the flue-curing schedule, where the barn air heats the packed
+;; leaf.
+;;
+;; Every number without a cited source is marked `estimate` in its :basis.
+;; Replacing an estimate with a sourced value is this bot's growth work.
+{:physics/schema "itonami.physical-ai.spec.v1"
+ :repo "cloud-itonami/cloud-itonami-isic-0115"
+ :cases
+ [{:id :leaf-racks-into-curing-barn
+   :kind :transport
+   :procedure "tug pushes a rack of freshly primed green leaf from the loading shed into the bulk curing barn"
+   :params {:mass-kg 150.0 :distance-m 40.0 :v-max-mps 0.8 :a-max-mps2 0.4
+            :brake-decel-mps2 0.8 :drive-force-n 600.0 :crr 0.03
+            :cog-height-m 0.90 :support-half-length-m 0.50 :max-time-s 3600.0}
+   :sweep {:param :payload-kg :values [200.0 400.0 600.0 800.0 1000.0]}
+   :quantity :cycle-time-s
+   :limit {:max 60.0 :basis "estimate: rack loading must fill a barn within one priming day"}
+   :boundary {:lo 50.0 :hi 3000.0}}
+  {:id :leaf-pack-in-curing-barn
+   :kind :thermal
+   :procedure "barn air at the schedule's dry-bulb setpoint heats a 20 cm packed leaf layer from both faces for 12 hours; the centre of the pack is judged"
+   :params {:thickness-m 0.10 :conductivity-w-mk 0.08 :density-kg-m3 150.0 :specific-heat-j-kgk 3000.0
+            :t0-c 25.0 :h-front-w-m2k 15.0 :t-back-ambient-c 25.0 :h-back-w-m2k 0.0
+            :threshold-c 70.0 :duration-s 43200.0 :nodes 11}
+   :sweep {:param :t-hot-c :values [38.0 45.0 55.0 65.0 75.0]}
+   :quantity :final-back-c
+   :limit {:max 70.0 :basis "estimate: packed leaf held below about 70 C during stem drying to avoid scorching (pure conduction; ignores air through-flow)"}
+   :boundary {:lo 30.0 :hi 90.0}}]}
