@@ -14,7 +14,7 @@
   rejection blocks commit. Mirrors `transportops.operation-test`
   (cloud-itonami-isic-869) / would mirror an equivalent for
   cloud-itonami-isic-0111 (cerealops), which does not yet have one."
-  (:require [clojure.test :refer [deftest is testing]]
+  (:require [kotoba.test :refer [deftest is testing]]
             [langgraph.graph :as g]
             [tobaccoops.operation :as operation]
             [tobaccoops.store :as store]))

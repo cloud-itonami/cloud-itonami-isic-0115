@@ -1,5 +1,5 @@
 (ns tobaccoops.registry-test
-  (:require [clojure.test :refer [deftest is testing]]
+  (:require [kotoba.test :refer [deftest is testing]]
             [tobaccoops.registry :as registry]))
 
 (deftest cost-exceeds-threshold-test
